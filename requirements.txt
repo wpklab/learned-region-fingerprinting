@@ -1,0 +1,28 @@
+# Core deep-learning stack
+# Tested with CUDA 12.x on NVIDIA H200 GPUs. Install a torch build that
+# matches your CUDA version (see https://pytorch.org/get-started/locally/).
+torch>=2.2
+torchvision>=0.17
+
+# Model zoo (EVA-02, ConvNeXt, PoolFormer, InceptionNeXt, ViT, etc.)
+timm>=1.0.0
+
+# LAMB optimizer used by all training entrypoints
+torch-optimizer>=0.3.0
+
+# DINOv3 backbone loading (transformers) — only needed for the DINOv3 option
+transformers>=4.44
+
+# Image processing / augmentation
+opencv-python>=4.9      # cv2, used for CLAHE
+Pillow>=10.0
+
+# Experiment tracking + hyperparameter sweeps (required: entrypoints run as W&B agents)
+wandb>=0.17
+
+# Numerics, data handling, plotting, utilities
+numpy>=1.26
+pandas>=2.0
+matplotlib>=3.8
+tqdm>=4.66
+joblib>=1.3
