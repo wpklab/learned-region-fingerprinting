@@ -13,7 +13,7 @@ aim_all_designs_all_views/
 ```
 
 - **Classes:** `Stratasys450mc-1 … Stratasys450mc-6` (present in every split).
-- **Total:** ~223,435 images, **≈135 GB** on disk.
+- **Total:** ~223,435 images, **141 GB** on disk (train 112 GB, val 29 GB, cell_val 771 MB).
 - `train/` and `val/` are synthetic renders (PNG); `cell_val/` is real phone photos (JPG) for
   sim-to-real evaluation. All three are worth keeping.
 
@@ -48,7 +48,7 @@ kaggle datasets create \
 Notes:
 - `--dir-mode zip` packs the directory tree into archives before upload — strongly recommended
   here (223k small files upload far faster zipped than individually).
-- This is a **~135 GB upload**; run it from a wired/stable connection and expect it to take a
+- This is a **~141 GB upload**; run it from a wired/stable connection and expect it to take a
   while. Use `tmux`/`screen` or `nohup` so it survives a disconnect.
 - To publish updates later: `kaggle datasets version -p <folder> -m "message" --dir-mode zip`.
 

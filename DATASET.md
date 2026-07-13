@@ -12,7 +12,7 @@ part serials and viewpoint images), reorganized to test different generalization
 
 | Dataset | Layout / purpose | Approx. images | Approx. size* |
 |---------|------------------|---------------:|--------------:|
-| `aim_all_designs_all_views` | **Canonical pool**, flat per printer. Used by the main DPS entrypoint and the baseline. | ~223,000 | ~135 GB |
+| `aim_all_designs_all_views` | **Canonical pool**, flat per printer. Used by the main DPS entrypoint and the baseline. | ~223,000 | 141 GB |
 | `aim_all_designs_all_views_design_separation_20_train_10_val` | Same images, nested by design; train/val split by **held-out part geometry**. | ~213,000 | ~130 GB |
 | `aim_all_designs_all_views_azimuth_separation_180_train_90_val` | Same images, split by **camera azimuth** (viewpoint generalization). | ~213,000 | ~130 GB |
 | `aim_all_designs_planar_view_180_train_90_val` | Planar-view subset. | ~77,000 | ~47 GB |
@@ -22,7 +22,7 @@ part serials and viewpoint images), reorganized to test different generalization
 
 \* Estimated as `image_count × 0.62 MB`; not a precise `du`. The full `data/` tree
 (all re-partitions + `Models/`, `Results/`, `csv_outputs/`) is well over 500 GB, but the
-**unique image content is ~135 GB** (the canonical pool) plus the small cross-process sets.
+**unique image content is ~141 GB** (the canonical pool) plus the small cross-process sets.
 
 ## What to publish on Kaggle (recommended)
 
@@ -30,7 +30,7 @@ Uploading every folder would push ~400+ GB of **duplicated pixels** (the `design
 `azimuth_separation`, and `planar_view` sets are the canonical images re-split). Instead:
 
 **Tier 1 — reproduce the headline result (recommended minimum).**
-Upload **`aim_all_designs_all_views`** (~135 GB). Both the DPS method
+Upload **`aim_all_designs_all_views`** (141 GB). Both the DPS method
 (`AIMS_fingerprint_dpp.py`) and the baseline (`AIMS_fingerprint_original_model.py`) train on it,
 so this alone reproduces the core source-identification result.
 
@@ -51,7 +51,7 @@ experiments reproducible.
 and the `wandb/` run directory — these are derived artifacts, not source data.
 
 ### Practical Kaggle notes
-- 135 GB is large for a single Kaggle dataset. Options: split the canonical pool into 2–3
+- 141 GB is large for a single Kaggle dataset. Options: split the canonical pool into 2–3
   Kaggle dataset "versions"/parts (e.g. by printer class), or upload via the Kaggle **API**
   (`kaggle datasets create`), which handles large uploads better than the web UI.
 - These are renders with fine surface texture that carries the "fingerprint" signal. Prefer
