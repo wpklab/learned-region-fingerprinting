@@ -1,14 +1,17 @@
-# Learned Region Selection for Generalized Source Identification of Additively Manufactured Parts
+# Learned Region Fingerprint Model for Generalized Source Identification of Additively Manufactured Parts
 
 Code for the paper **"Learned Region Selection and Deep Learning for Generalized Source
 Identification of Additively Manufactured Parts."**
 
-Given an image of a 3D-printed part, the goal is to identify its **source** — which machine
-(and, in related experiments, which process, material, or build-plate location) produced it —
-in a way that **generalizes to part geometries and camera viewpoints never seen during
-training**. Instead of feeding the whole high-resolution image to a CNN, the model *learns
-which small regions of the part surface are most informative* (the manufacturing "fingerprint")
-and classifies from those regions only.
+Additive manufacturing (AM) imparts machine-specific fingerprints into the surface texture of
+printed parts, which can be used to identify the machine or factory of origin. This repository
+implements the **Learned Region Fingerprint Model (LRFM)**, a deep learning network that
+predicts the manufacturing source of an AM part from a high-resolution photograph and
+**generalizes to part designs and camera view angles not present in the training dataset**.
+Fingerprinting features can appear anywhere on the part and are not perceptible or describable
+by humans. Rather than downscaling the whole high-resolution image into a CNN — which destroys
+the fine-grained textural detail the fingerprint lives in — the LRFM *learns which small regions
+of the part surface carry the manufacturing fingerprint* and classifies from those regions only.
 
 <img width="1001" alt="Overview" src="https://github.com/user-attachments/assets/91fb9945-3828-49ee-8efb-f3f1bd8a3bea" />
 
@@ -30,40 +33,48 @@ and classifies from those regions only.
 
 ---
 
-## How the method works
+## How the LRFM works
 
-The core contribution is a **differentiable "learned region selection"** front-end (called
-**DPS** — Determinantal / Differentiable Patch Sampling) defined in
-[`fingerprint_proposal.py`](fingerprint_proposal.py):
+The LRFM is a multi-stage architecture that integrates a **Differentiable Patch Selection (DPS)**
+module to identify salient regions of interest in the high-resolution image, a **Fingerprinting
+(FP)** module to extract features from each region, and a learned **Consolidation Network** that
+aggregates the patch features into a single source prediction. The DPS module — the core
+contribution — is defined in [`fingerprint_proposal.py`](fingerprint_proposal.py):
 
-1. **Score.** A lightweight ResNet-18 *scorer* maps a downscaled copy of the full part image
-   (e.g. 850×850) to a coarse 2-D saliency grid (e.g. 52×52).
-2. **Select (differentiably).** A **perturbed top-k** operator (Gumbel-style noise + a custom
-   backward pass) picks the `k` highest-scoring grid cells as a *soft, trainable* selection, so
-   gradients flow back into the scorer. A noise scale `sigma` is annealed from soft →
-   near-hard selection over training.
-3. **Crop.** The selected cells are mapped back to the **full-resolution** image and cropped
-   into `k` fixed-size patches (default **448×448**, `k = 8`).
-4. **Encode.** Each patch is passed through a shared image backbone (EfficientNetV2, ConvNeXt,
-   ViT, EVA-02, DINOv3, … — swappable by name).
-5. **Aggregate & classify.** A small **cross-attention Transformer** pools the `k` patch
-   embeddings with learnable query tokens and predicts the source class. At test time,
-   predictions over the sampled patches are combined by majority/soft voting.
+1. **Score.** A lightweight *scorer* (two convolution layers plus two layers of a ResNet-18) maps
+   a downscaled copy of the full part image (**850×850**) to a coarse relevance grid, producing
+   importance scores for 2704 candidate patches arranged in a **52×52** grid.
+2. **Select (differentiably).** A **differentiable Top-K** operator, made differentiable through
+   the perturbed maximum method (Gumbel-style noise + a custom backward pass), picks the `k`
+   highest-scoring grid cells as a *soft, trainable* selection, so gradients flow back into the
+   scorer. Patch selection is trained jointly with the FP module and Consolidation Network. A
+   noise scale `sigma` is annealed over training, so the selection starts as a soft weighted sum
+   of many overlapping patches (encouraging exploration) and sharpens toward individual patches.
+3. **Crop.** The selected cells are mapped back to the **full-resolution** image and cropped into
+   `k` fixed-size patches (default **448×448**, `k = 8`).
+4. **Encode (FP module).** Each patch is passed through a shared image backbone that outputs a
+   latent feature vector. The paper uses **EVA-02-L** (304M parameters) for its state-of-the-art
+   fine-grained classification performance; other backbones (EfficientNetV2, MobileNetV4,
+   ConvNeXt, ViT, DINOv3, …) are selectable by name.
+5. **Aggregate & classify (Consolidation Network).** A **transformer classifier** whose learnable
+   query embeddings attend over the set of `k` patch latent vectors learns relationships between
+   patches through self-attention and outputs a softmax prediction of the source class.
 
-A convolutional-baseline variant (no learned selection — random crops + test-time voting on an
-EfficientNetV2-M) is also provided for comparison.
+A baseline variant reproducing the **Random Region Fingerprinting Model (RRFM)** from prior work
+— random patch selection, an EfficientNetV2-M backbone, and majority-vote consolidation — is also
+provided for comparison.
 
 ## Repository contents
 
 | File | Role |
 |------|------|
-| `fingerprint_proposal.py` | **Core method.** `DPS` (scorer + perturbed-top-k region selection + sigma annealing), `TransformerClassifier`, `FlexibleMLP`. Imported by the entrypoints. |
-| `AIMS_fingerprint_dpp.py` | **Main training entrypoint** — full learned-region-selection model (DPS + backbone + Transformer). Trains on `aim_all_designs_all_views`. |
-| `AIMS_fingerprint_design_sweep.py` | **Generalization experiment** — trains/evaluates with a *design-separation* split (train on some part geometries, test on held-out ones). |
-| `AIMS_fingerprint_original_model.py` | **Baseline** — EfficientNetV2-M on random crops with test-time voting (no learned selection). |
+| `fingerprint_proposal.py` | **Core method.** `DPS` (scorer + perturbed Top-K region selection + sigma annealing), `TransformerClassifier` (the Consolidation Network), `FlexibleMLP`. Imported by the entrypoints. |
+| `AIMS_fingerprint_dpp.py` | **Main training entrypoint** — full LRFM (DPS module + FP backbone + transformer Consolidation Network). Trains on `aim_all_designs_all_views`. |
+| `AIMS_fingerprint_design_sweep.py` | **Design-generalization experiment** — trains/evaluates with a *design-separation* split (train on some part designs, test on held-out ones). |
+| `AIMS_fingerprint_original_model.py` | **RRFM baseline** — EfficientNetV2-M on random patches with test-time majority voting (no learned selection). |
 | `region_fingerprint_faster.py` | Training/eval library used by `AIMS_fingerprint_dpp.py` (`train_model`, `test_model`, `initialize_model`, DDP metric gathering, early stopping, visualization). |
 | `region_fingerprint_dpp.py` | Training/eval library used by `AIMS_fingerprint_design_sweep.py`. |
-| `ml_models.py` | Training/eval library used by the baseline entrypoint. |
+| `ml_models.py` | Training/eval library used by the RRFM baseline entrypoint. |
 | `aims_H200.sbatch` | Example multi-node SLURM launch script (H200 GPUs, NCCL/NVLink tuning). |
 | `requirements.txt` | Python dependencies. |
 
@@ -73,6 +84,11 @@ EfficientNetV2-M) is also provided for comparison.
 
 ## The data
 
+The dataset was produced by manufacturing 1,890 parts (nine part designs, 35 repeats each) from
+**six contract manufacturers** on industrial FDM printers (Stratasys Fortus 450mc and 900mc), and
+imaging every part from 132 view angles with a custom robotic capture system (the Automated
+Imaging Metrology System, AIMS) for a total of 213,840 images.
+
 The models expect a standard **`torchvision.ImageFolder`** layout, with one subfolder per
 source class. The primary dataset (`aim_all_designs_all_views`) is *flat* — images live directly
 under each class:
@@ -80,27 +96,29 @@ under each class:
 ```
 data/aim_all_designs_all_views/
 ├── train/
-│   ├── Stratasys450mc-1/          # one folder per printer (the class label)
+│   ├── Stratasys450mc-1/          # one folder per source class (supplier)
 │   │   ├── A22222_azimuth_0_polar_0.png
 │   │   ├── A22222_azimuth_0_polar_14.png
 │   │   └── ...
 │   ├── Stratasys450mc-2/
-│   └── ... (6 printers total)
+│   └── ... (6 suppliers total)
 └── val/
     └── ... (same 6 classes)
 ```
 
-- **Classes:** 6 Stratasys 450mc (FDM) printers — `Stratasys450mc-1 … Stratasys450mc-6`.
-- **Images:** 2550×2550 RGB PNG renders of printed parts.
+- **Classes:** 6 suppliers (the supplier of origin), one folder per class — e.g.
+  `Stratasys450mc-1 … Stratasys450mc-6`.
+- **Images:** 2550×2550 RGB PNG photographs of printed parts.
 - **Filename convention:** `{SERIAL}_azimuth_{A}_polar_{P}.png`, where the first 6 characters
   are the **physical-part serial** and the rest encode the **camera viewpoint** (azimuth / polar
-  angle). Each printer has ~200 distinct parts (serials), each rendered from many viewpoints.
+  angle). Each supplier contributes many distinct parts (serials), each imaged from many
+  viewpoints.
 
 Some experiments use **re-partitioned** copies of this same image pool that add a design
 sub-level and split by held-out attribute — e.g. `aim_all_designs_all_views_design_separation_20_train_10_val`
 nests images by part design (`.../Stratasys450mc-1/Connector/…`) to test generalization to
-unseen geometries, and `..._azimuth_separation_…` splits train/val by camera angle to test
-viewpoint generalization.
+unseen part designs, and `..._azimuth_separation_…` splits train/val by camera azimuth to test
+view-angle generalization.
 
 See **[DATASET.md](DATASET.md)** for the full dataset family, sizes, and download instructions.
 
@@ -201,10 +219,11 @@ The scripts are honest research code. To run them on your own data/cluster, expe
 If you use this code or dataset, please cite the paper (citation to be added):
 
 ```bibtex
-@article{learned_region_fingerprinting,
+@article{bimrose_learned_region_fingerprinting,
   title   = {Learned Region Selection and Deep Learning for Generalized Source
              Identification of Additively Manufactured Parts},
-  author  = {WPK Lab},
+  author  = {Bimrose, Miles V. and Shin, James H. and Zheng, Weixuan and
+             Tawfick, Sameh and King, William P.},
   year    = {2025}
 }
 ```
