@@ -122,8 +122,16 @@ view-angle generalization.
 
 See **[DATASET.md](DATASET.md)** for the full dataset family, sizes, and download instructions.
 
-> 📦 **Dataset download:** *to be published on Kaggle — link coming soon.* See
-> [DATASET.md](DATASET.md) for what will be uploaded.
+> 📦 **Dataset download — Kaggle:**
+> **https://www.kaggle.com/datasets/milesbimrose/aims-am-source-identification**
+>
+> This publishes the canonical **`aim_all_designs_all_views`** pool (141 GB): `train`/`val`
+> synthetic renders plus a `cell_val` real-phone-photo test set, across the six
+> `Stratasys450mc-*` printer classes.
+>
+> *Note: the Kaggle dataset is currently **private** and becomes **public** when the paper is
+> published.* Until then the link will 404 unless you have been granted access. See
+> [DATASET.md](DATASET.md) for the full dataset family.
 
 ## Setup
 
@@ -136,8 +144,14 @@ python -m venv .venv && source .venv/bin/activate     # or conda
 # then the rest:
 pip install -r requirements.txt
 
-# Place (or symlink) the dataset so the scripts find it at ./data/<dataset_name>
+# Download the dataset so the scripts find it at ./data/<dataset_name>.
+# Once the Kaggle dataset is public (see "Dataset download" above), grab it with the Kaggle CLI:
 mkdir -p data
+pip install kaggle   # needs an API token in ~/.kaggle/kaggle.json (kaggle.com/settings)
+kaggle datasets download -d milesbimrose/aims-am-source-identification -p data/ --unzip
+# result: data/aim_all_designs_all_views/{train,val,cell_val}/...
+
+# Already have the data elsewhere? Symlink it instead:
 ln -s /path/to/downloaded/aim_all_designs_all_views data/aim_all_designs_all_views
 ```
 
